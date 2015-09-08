@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <meta charset="utf-8">
+    <title>ПАБК</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 100%;
+      }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+
+
+
+</head>
+<body>
+    <h2>GoogleMap</h2>
+    <div id="map" style="width: 1400px; height: 500px;"></div>
+
+
+    <script>
+
+        function httpGetAsync(theUrl, callback)
+            {
+                var xmlHttp = new XMLHttpRequest();
+                xmlHttp.onreadystatechange = function() {
+                    if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+                        callback(xmlHttp.responseText);
+                    }
+                xmlHttp.open("GET", theUrl, true); // true for asynchronous
+                xmlHttp.send(null);
+            }
+
+        function getCoordList(ip, callback){
+                return new Promise(function(resolve, reject){
+                    $.get("http://ipinfo.io/"+ip, function(data){
+                        // var lats = data.loc.split(',')[0];
+                        // var lngs = data.loc.split(',')[1];
+                        // deferred.push({'coords': [lats, lngs], 'text':'New'});
+                        resolve(data);
+                        }, "jsonp");
+                });
+        }
+
+        var getLocalIp = function(url, callback){
+            httpGetAsync('http://95.163.84.176:45000/' , function(data){
+                ip_list = data.match(/\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g);
+                callback(ip_list);
+            });
+
+        }
+
+        function fillCollection(ip_list, callback){
+            return new Promise(function(resolve, reject){
+                var points = [];
+                var promises = [];
+                for (var i=0, l = ip_list.length; i < l; i++){
+                    console.log(i);
+                    promises.push(
+                        getCoordList(ip_list[i]).then(function(coord){
+                            console.log(coord);
+                            points.push({'coords': coord.loc, 'text': coord.org, 'info': coord.hostname });
+                        })
+                    )
+                }
+                Promise.all(promises).then(function(){
+                    console.log('in resolve all');
+                    resolve(points)});
+
+            })
+        }
+
+        function addPlace(points){
+                for (var i = 0, l = points.length; i < l; i++) {
+                    var point = points[i];
+                    coord = {lat: Number(point.coords.split(',')[0]), lng: Number(point.coords.split(',')[1])};
+                    content = point.text;
+                    console.log(coord);
+
+                    infowindow = new google.maps.InfoWindow();
+                    marker = new google.maps.Marker({position: coord, map: map, title: point.text});
+                    // <!--marker[i].addListener('click', function() {
+                    //     infowindow[i].open(map, marker[i]);
+                    // });-->
+                    google.maps.event.addListener(marker, 'click', (function(marker, content, infowindow){
+                        return function() {
+                            infowindow.setContent(content);
+                            infowindow.open(map, marker);
+                        };
+                    })(marker,content,infowindow));
+
+                }
+        }
+//инициализация карты в div "map"
+var map;
+function initMap() {
+    getLocalIp('url', function(data){
+            console.log(data.length);
+            fillCollection(data).then(function(points){
+                addPlace(points);
+            });
+        });
+
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: {lat: 55.66, lng: 37.48},
+    zoom: 8
+  });
+
+  google.maps.event.addListener(map, 'click', function (event) {
+        addMarker(event.latLng);
+    }); //добавляем событие нажание мышки
+}
+    //добавление маркера
+    </script>
+        <script src="https://maps.googleapis.com/maps/api/js?callback=initMap" async defer></script>
+
+</body>
+</html>
